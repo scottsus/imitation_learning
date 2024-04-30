@@ -97,11 +97,11 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         self.mean_net = build_mlp(
             input_size=self.ob_dim,
             output_size=self.ac_dim,
-            n_layers=self.n_layers, size=self.size,
+            n_layers=self.n_layers,
+            size=self.size,
         )
         self.mean_net.to(ptu.device)
         self.logstd = nn.Parameter(
-
             torch.zeros(self.ac_dim, dtype=torch.float32, device=ptu.device)
         )
         self.logstd.to(ptu.device)
@@ -109,6 +109,7 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             itertools.chain([self.logstd], self.mean_net.parameters()),
             self.learning_rate
         )
+        print("Itertools:", self.mean_net.parameters())
 
     def save(self, filepath):
         """
@@ -116,7 +117,7 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         """
         torch.save(self.state_dict(), filepath)
 
-    def forward(self, observation: torch.FloatTensor) -> Any:
+    def forward(self, observation: torch.FloatTensor) -> torch.FloatTensor:
         """
         Defines the forward pass of the network
 
@@ -124,18 +125,19 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         :return:
             action: sampled action(s) from the policy
         """
-        # =================== YOUR CODE HERE (CSCI 545) ======================== #
         # TODO: implement the forward pass of the network.
         # You can return anything you want, but you should be able to differentiate
         # through it. For example, you can return a torch.FloatTensor. You can also
         # return more flexible objects, such as a
         # `torch.distributions.Distribution` object. It's up to you!
-        # However, you will probably find it easier just to call something in
-        # the __init__ method.
-        raise NotImplementedError
-        # =================== end YOUR CODE HERE (CSCI 545) ======================== #
+        mean = self.mean_net(observation)
+        std = torch.exp(self.logstd)
+        dist = distributions.Normal(mean, std)
+        action = dist.rsample()
 
-    def update(self, observations, actions):
+        return action
+
+    def update(self, observations: np.ndarray, actions: np.ndarray) -> dict:
         """
         Updates/trains the policy
 
@@ -144,12 +146,13 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         :return:
             dict: 'Training Loss': supervised learning loss
         """
-        # =================== YOUR CODE HERE (CSCI 545) ======================== #
         # TODO: update the policy and return the loss
-        # HINT: you might want to look at the provided pytorch utils we provide,
-        # which was imported above with `ptu`.
-        loss = TODO
-        # =================== END YOUR CODE HERE (CSCI 545) ======================== #
+        pred_actions = self.forward(ptu.from_numpy(observations))
+        loss = F.mse_loss(pred_actions, ptu.from_numpy(actions))
+        
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
         return {
             # You can add extra logging information here, but keep this line

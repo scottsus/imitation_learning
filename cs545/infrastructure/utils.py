@@ -8,7 +8,7 @@ Functions to edit:
 from collections import OrderedDict
 import cv2
 import numpy as np
-import time
+import random
 
 from cs545.infrastructure import pytorch_util as ptu
 
@@ -17,13 +17,12 @@ def sample_trajectory(env, policy, max_path_length, render=False):
     """Sample a rollout in the environment from a policy."""
     
     # initialize env for the beginning of a new rollout
-    ob =  env.reset() # TODO: initial observation after resetting the env
+    ob = env.reset(seed=random.randint(1, int(1e6))) # TODO: initial observation after resetting the env
 
     # init vars
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
     steps = 0
     while True:
-
         # render image of the simulated env
         if render:
             if hasattr(env, 'sim'):
@@ -32,18 +31,16 @@ def sample_trajectory(env, policy, max_path_length, render=False):
                 img = env.render(mode='single_rgb_array')
             image_obs.append(cv2.resize(img, dsize=(250, 250), interpolation=cv2.INTER_CUBIC))
     
-        # =================== YOUR CODE HERE (CSCI 545) ======================== #
         # TODO use the most recent ob to decide what to do
-        # HINT: be careful about dimensions and if something should have a leading
-        # batch dimension
-        ac = TODO  # HINT: this is a numpy array
+        ac = policy.forward(ptu.from_numpy(ob))
+        ac = np.squeeze(ptu.to_numpy(ac))
 
-        # TODO: take that action and get reward and next ob by stepping in the env
-        next_ob, rew, done, _ = TODO
-        # =================== END YOUR CODE HERE (CSCI 545) ==================== #
-
+        # TODO: take that action and get reward and next ob
+        next_ob, rew, done, _ = env.step(ac)
+        
+        # TODO rollout can end due to done, or due to max_path_length
         steps += 1
-        rollout_done = done or (steps == max_path_length) # this is either 0 or 1
+        rollout_done = done or (steps >= max_path_length) # HINT: this is either 0 or 1
         
         # record result of taking that action
         obs.append(ob)
@@ -58,12 +55,14 @@ def sample_trajectory(env, policy, max_path_length, render=False):
         if rollout_done:
             break
 
-    return {"observation" : np.array(obs, dtype=np.float32),
-            "image_obs" : np.array(image_obs, dtype=np.uint8),
-            "reward" : np.array(rewards, dtype=np.float32),
-            "action" : np.array(acs, dtype=np.float32),
-            "next_observation": np.array(next_obs, dtype=np.float32),
-            "terminal": np.array(terminals, dtype=np.float32)}
+    return {
+        "observation" : np.array(obs, dtype=np.float32),
+        "image_obs" : np.array(image_obs, dtype=np.uint8),
+        "reward" : np.array(rewards, dtype=np.float32),
+        "action" : np.array(acs, dtype=np.float32),
+        "next_observation": np.array(next_obs, dtype=np.float32),
+        "terminal": np.array(terminals, dtype=np.float32)
+    }
 
 
 def sample_trajectories(env, policy, min_timesteps_per_batch, max_path_length, render=False):
@@ -112,6 +111,7 @@ def convert_listofrollouts(paths, concat_rew=True):
         rewards = [path["reward"] for path in paths]
     next_observations = np.concatenate([path["next_observation"] for path in paths])
     terminals = np.concatenate([path["terminal"] for path in paths])
+    
     return observations, actions, rewards, next_observations, terminals
 
 

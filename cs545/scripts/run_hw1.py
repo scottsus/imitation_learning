@@ -129,21 +129,23 @@ def run_training_loop(params):
         else:
             # DAGGER training from sampled data relabeled by expert
             assert params['do_dagger']
-            # =================== YOUR CODE HERE (CSCI 545) ======================== #
             # TODO: collect `params['batch_size']` transitions
-            # HINT: call `utils.sample_trajectories`
+            # HINT: use utils.sample_trajectories
             # TODO: implement missing parts of utils.sample_trajectory
-            paths, envsteps_this_batch = TODO
+            paths, envsteps_this_batch = utils.sample_trajectories(
+              env, actor, params['batch_size'], params['ep_len']
+            )
 
             # relabel the collected obs with actions from a provided expert policy
             if params['do_dagger']:
                 print("\nRelabelling collected observations with labels from an expert policy...")
 
-                # TODO: relabel collected obsevations (from our policy) with labels from expert policy
+                # TODO: relabel collected observations (from our policy) with labels from expert policy
                 # HINT: query the policy (using the get_action function) with paths[i]["observation"]
                 # and replace paths[i]["action"] with these expert labels
-                paths = TODO
-                # =================== END YOUR CODE HERE (CSCI 545) ======================== #
+                for path in paths:
+                  obs = path['observation']
+                  path['action'] = expert_policy.get_action(obs)
 
         total_envsteps += envsteps_this_batch
         # add collected data to replay buffer
@@ -153,14 +155,16 @@ def run_training_loop(params):
         print('\nTraining agent using sampled data from replay buffer...')
         training_logs = []
         for _ in range(params['num_agent_train_steps_per_iter']):
-          # =================== YOUR CODE HERE (CSCI 545) ======================== #    
+
           # TODO: sample some data from replay_buffer
           # HINT1: how much data = params['train_batch_size']
           # HINT2: use np.random.permutation to sample random indices
           # HINT3: return corresponding data points from each array (i.e., not different indices from each array)
-          # for imitation learning, we only need observations and actions.  
-          ob_batch, ac_batch = TODO
-          # =================== END YOUR CODE HERE (CSCI 545) ======================== # 
+          # for imitation learning, we only need observations and actions.
+          indices = np.random.permutation(
+            len(replay_buffer.obs)
+          )[:params['train_batch_size']]
+          ob_batch, ac_batch = replay_buffer.obs[indices], replay_buffer.acs[indices]
 
           # use the sampled data to train an agent
           train_log = actor.update(ob_batch, ac_batch)
@@ -172,7 +176,8 @@ def run_training_loop(params):
             # save eval rollouts as videos in tensorboard event file
             print('\nCollecting video rollouts eval')
             eval_video_paths = utils.sample_n_trajectories(
-                env, actor, MAX_NVIDEO, MAX_VIDEO_LEN, True)
+                env, actor, MAX_NVIDEO, MAX_VIDEO_LEN, True
+            )
 
             # save videos
             if eval_video_paths is not None:
@@ -180,13 +185,15 @@ def run_training_loop(params):
                     eval_video_paths, itr,
                     fps=fps,
                     max_videos_to_save=MAX_NVIDEO,
-                    video_title='eval_rollouts')
+                    video_title='eval_rollouts'
+                )
 
         if log_metrics:
             # save eval metrics
             print("\nCollecting data for eval...")
             eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(
-                env, actor, params['eval_batch_size'], params['ep_len'])
+                env, actor, params['eval_batch_size'], params['ep_len']
+            )
 
             logs = utils.compute_metrics(paths, eval_paths)
             # compute additional metrics
