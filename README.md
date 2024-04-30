@@ -1,3 +1,9 @@
+# 🤖 Imitation Learning
+
+## Demo
+
+![DAgger](https://github.com/scottsus/imitation_learning/assets/88414565/bdcdaa9d-e081-4225-8df9-49f681db2255)
+
 ## Setup
 
 You can run this code on your own machine or on Google Colab. 
